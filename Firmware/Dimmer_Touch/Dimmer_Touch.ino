@@ -1,9 +1,12 @@
 #include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 
+const char* ssid = "Maestros";//escribe tu SSID
+const char* password = "docentes_2018";//escribe tu password
 //const char* ssid = "WiFi Aguilera";//escribe tu SSID
 //const char* password = "0142035152";//escribe tu password
-const char* ssid = "LabElectro-2";//escribe tu SSID
-const char* password = "njLHwHh43";//escribe tu password
+//const char* ssid = "LabElectro-2";//escribe tu SSID
+//const char* password = "njLHwHh43";//escribe tu password
 const char* mqtt_server = "test.mosquitto.org"; /// MQTT Broker
 int mqtt_port = 1883;
 //const char *ssid = "Maestros";
@@ -37,20 +40,7 @@ void setup() {
   //attachInterrupt(0, ZC_detect, CHANGE); 
   digitalWrite(triac_gate, LOW);// Enable external interrupt (INT0)
 
-   setup_wifi();
- clienteMQTT.setServer(mqtt_server, mqtt_port);
- clienteMQTT.setCallback(mensajeRecibido);
- clienteMQTT.connect("ModuloDimmerLampara01");
- clienteMQTT.subscribe("Casa/Habitaciones/Habitacion1/Luz1/");
  
- Serial.println("Connected ");
- Serial.print("MQTT Server ");
- Serial.print(mqtt_server);
- Serial.print(":");
- Serial.println(String(mqtt_port)); 
- Serial.print("ESP8266 IP ");
- Serial.println(WiFi.localIP()); 
- Serial.println("Modbus RTU Master Online");
 
   // Conectamos a el WiFi
   Serial.println();
@@ -77,16 +67,54 @@ void setup() {
   Serial.print(WiFi.localIP());
   Serial.println("/");
 
+  clienteMQTT.setServer(mqtt_server, mqtt_port);
+  clienteMQTT.setCallback(mensajeRecibido);
+  
+  while(!clienteMQTT.connected()){
+    if (clienteMQTT.connect("ModuloDimmerLampara01")){
+      Serial.println("Connected ");
+      Serial.print("MQTT Server ");
+      Serial.print(mqtt_server);
+      Serial.print(":");
+      Serial.println(String(mqtt_port)); 
+      Serial.print("ESP8266 IP ");
+      Serial.println(WiFi.localIP()); 
+      clienteMQTT.subscribe("Casa/Habitaciones/#");
+    }else{
+      Serial.print("Falla en la conexion codigo: ");
+      Serial.print(clienteMQTT.state());
+      Serial.println("reconexion en 5 segundos");
+      delay(5000);
+    }
+  }
+  
+
 }
 void mensajeRecibido(char* topic, byte* payload, unsigned int length) {
+String spayload = "";
  Serial.print("Message arrived [");
  Serial.print(topic);
  Serial.print("] ");
- for (int i = 0; i &lt; length; i++) {
- Serial.print((char)payload[i]);
+ for (int i = 0; i < length; i++) {
+  Serial.print((char)payload[i]);
+  spayload += (char)payload[i]; // spayload = spayload + 
  }
  Serial.println();
+ Serial.print("spayload: ");
+ Serial.println(spayload);
  
+ if (spayload.toInt()!=0){
+  Serial.print("Numero: ");
+  Serial.println(spayload.toInt());
+  Valor = spayload.toInt();//Dimmer
+ }else{
+  if (spayload=="ON"){
+  Serial.println("Rele encendido");
+  }
+ if (spayload=="OFF"){
+  Serial.println("Rele Apagado");
+ }
+ }
 }
 
 void ZC_detect() {
@@ -97,7 +125,7 @@ void loop() {
   //client.publish("Casa/Habitaciones/Habitacion1/Luz1/", ); /// send char 
   //client.publish("Casa/Habitaciones/Habitacion1/Luz2/", ); /// send char 
   // Checamos si un cliente se ha conectado
-  WiFiClient client = server.available();
+  /*WiFiClient client = server.available();
   if (client) {
     //return;
     // Espere hasta que el cliente envíe algunos datos
@@ -178,37 +206,37 @@ void loop() {
     client.println("<a href=\"APAGADO\"><button>Apagado</button></a>&nbsp;<a href=\"BAJO\"><button>Bajo</button></a>&nbsp;<a href=\"MEDIO\"><button>Medio</button></a>&nbsp;<a href=\"ALTO\"><button>Alto</button></a>&nbsp;<a href=\"ENCENDIDO\"><button>Encencido</button></a></p>");
     client.println("</html>");
     //<input type='button' name='boton' value='Boton' style='width:70px; height:25px'>
-
-    delay(1);
-    Serial.println("Cliente desconectado");
-    Serial.println("");
-    client.flush();
-
-  }
-
-  // Checamos si coincide la solicitud
-
-  if (digitalRead(TouchSensor) == HIGH) //lectura de señal del sensor
+*/
+    if (digitalRead(TouchSensor) == HIGH) //lectura de señal del sensor
   {
     delay(150);
     if (digitalRead(TouchSensor) == HIGH) //lectura de señal del sensor
       {   
-        if (EstadoLuz == 1)
+        if (EstadoLuz == HIGH)
         {
           EstadoLuz = LOW;
           digitalWrite(Lampara, LOW);   // si la lectura esta en alto el led se enciende
           Serial.println("OFF");
-          client.print("Encendido");
+          //client.print("Apagado");
         }//ESTADO LUZ
         else
         {
           EstadoLuz = HIGH;
           digitalWrite(Lampara, HIGH);    // si no existe lectura el ed se apaga o no enciende
           Serial.println("ON");
-          client.print("Encendido");
+          //client.print("Encendido");
         } //ELSE
       }
   } // if sensor
+    //delay(1);
+    //Serial.println("Cliente desconectado");
+    //Serial.println("");
+    //client.flush();
+    clienteMQTT.loop();
+ // }
+
+  // Checamos si coincide la solicitud
+
 
   if(ZC){
     if(alpha < 9500) {
