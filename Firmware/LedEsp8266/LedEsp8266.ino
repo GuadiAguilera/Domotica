@@ -93,7 +93,7 @@ void loop() {
     delay(150);
     if (digitalRead(TouchSensor) == HIGH) //lectura de señal del sensor
       {   
-        if (EstadoLuz == 1)
+        if (EstadoLuz == HIGH)
         {
           digitalWrite(Lampara, LOW);   // si la lectura esta en alto el led se enciende
           EstadoLuz = LOW;
